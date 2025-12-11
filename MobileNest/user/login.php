@@ -12,6 +12,18 @@ $register_url = "register.php";
 $keranjang_url = "../transaksi/keranjang.php";
 
 include '../includes/header.php';
+
+// Get error or success message from session
+$error_message = $_SESSION['error'] ?? '';
+$success_message = $_SESSION['success'] ?? '';
+
+// Clear messages from session after displaying
+if (isset($_SESSION['error'])) {
+    unset($_SESSION['error']);
+}
+if (isset($_SESSION['success'])) {
+    unset($_SESSION['success']);
+}
 ?>
 
     <div class="container">
@@ -26,8 +38,21 @@ include '../includes/header.php';
                             <p class="text-muted">Masuk ke akun Anda</p>
                         </div>
 
-                        <!-- Alert Messages -->
-                        <div id="alert-container"></div>
+                        <!-- Success Alert -->
+                        <?php if (!empty($success_message)): ?>
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                <i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($success_message); ?>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Error Alert -->
+                        <?php if (!empty($error_message)): ?>
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        <?php endif; ?>
 
                         <!-- Form -->
                         <form action="proses-login.php" method="POST">
