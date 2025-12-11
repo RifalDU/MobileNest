@@ -4,7 +4,7 @@ require_once __DIR__ . '/../config.php';
 
 // autentikasi
 if (!isset($_SESSION['admin']) && !isset($_SESSION['user'])) {
-    header('Location: ../login.php');
+    header('Location: ../user/login.php');
     exit;
 }
 
@@ -200,7 +200,7 @@ if (isset($_GET['edit'])) {
         <li class="nav-item"><a class="nav-link active" href="kelola-produk.php">Kelola Produk</a></li>
         <li class="nav-item"><a class="nav-link" href="kelola-transaksi.php">Transaksi</a></li>
         <li class="nav-item"><a class="nav-link" href="laporan.php">Laporan</a></li>
-        <li class="nav-item"><a class="nav-link text-danger" href="../logout.php">Logout</a></li>
+        <li class="nav-item"><a class="nav-link text-danger" href="../user/logout.php">Logout</a></li>
       </ul>
     </div>
   </div>
