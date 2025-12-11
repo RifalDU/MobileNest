@@ -12,6 +12,67 @@ $register_url = "../user/register.php";
 $keranjang_url = "../transaksi/keranjang.php";
 
 include '../includes/header.php';
+
+// Get filter parameters from URL
+$selected_brands = isset($_GET['brands']) ? $_GET['brands'] : array();
+if (is_string($selected_brands)) {
+    $selected_brands = array($selected_brands);
+}
+
+$selected_price = isset($_GET['price']) ? $_GET['price'] : '';
+$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+$sort_by = isset($_GET['sort']) ? $_GET['sort'] : 'terbaru';
+
+// Build WHERE clause
+$where_conditions = array("status_produk = 'Tersedia'");
+
+// Search filter
+if (!empty($search_query)) {
+    $search = mysqli_real_escape_string($conn, $search_query);
+    $where_conditions[] = "(nama_produk LIKE '%$search%' OR merek LIKE '%$search%')";
+}
+
+// Brand filter
+if (!empty($selected_brands)) {
+    $brands_list = array();
+    foreach ($selected_brands as $brand) {
+        $brand = mysqli_real_escape_string($conn, $brand);
+        $brands_list[] = "merek = '$brand'";
+    }
+    if (!empty($brands_list)) {
+        $where_conditions[] = '(' . implode(' OR ', $brands_list) . ')';
+    }
+}
+
+// Price filter
+if (!empty($selected_price)) {
+    if ($selected_price === '0-3000000') {
+        $where_conditions[] = "harga BETWEEN 0 AND 3000000";
+    } elseif ($selected_price === '3000000-7000000') {
+        $where_conditions[] = "harga BETWEEN 3000000 AND 7000000";
+    } elseif ($selected_price === '7000000-15000000') {
+        $where_conditions[] = "harga BETWEEN 7000000 AND 15000000";
+    } elseif ($selected_price === '15000000') {
+        $where_conditions[] = "harga >= 15000000";
+    }
+}
+
+$where_sql = implode(' AND ', $where_conditions);
+
+// Determine sort order
+$order_sql = "tanggal_ditambahkan DESC";
+if ($sort_by === 'termurah') {
+    $order_sql = "harga ASC";
+} elseif ($sort_by === 'termahal') {
+    $order_sql = "harga DESC";
+} elseif ($sort_by === 'populer') {
+    $order_sql = "id_produk DESC";
+}
+
+// Execute query
+$sql = "SELECT * FROM produk WHERE $where_sql ORDER BY $order_sql";
+$result = mysqli_query($conn, $sql);
+$total_products = mysqli_num_rows($result);
 ?>
 
     <!-- PAGE TITLE -->
@@ -31,62 +92,69 @@ include '../includes/header.php';
                         <i class="bi bi-funnel"></i> Filter
                     </div>
                     <div class="card-body">
-                        <!-- Search -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold mb-2">Cari Produk</h6>
-                            <input type="text" id="searchInput" class="form-control" placeholder="Ketik nama produk...">
-                        </div>
+                        <form method="GET" action="list-produk.php">
+                            <!-- Search -->
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-2">Cari Produk</h6>
+                                <input type="text" name="search" class="form-control" placeholder="Ketik nama produk..." value="<?php echo htmlspecialchars($search_query); ?>">
+                            </div>
 
-                        <!-- Filter by Brand -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold mb-2">Merek</h6>
-                            <div class="form-check">
-                                <input class="form-check-input brand-filter" type="checkbox" value="Samsung" id="samsung">
-                                <label class="form-check-label" for="samsung">Samsung</label>
+                            <!-- Filter by Brand -->
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-2">Merek</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="brands[]" value="Samsung" id="samsung" <?php echo in_array('Samsung', $selected_brands) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="samsung">Samsung</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="brands[]" value="Apple" id="apple" <?php echo in_array('Apple', $selected_brands) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="apple">Apple</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="brands[]" value="Xiaomi" id="xiaomi" <?php echo in_array('Xiaomi', $selected_brands) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="xiaomi">Xiaomi</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="brands[]" value="Oppo" id="oppo" <?php echo in_array('Oppo', $selected_brands) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="oppo">Oppo</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="brands[]" value="Realme" id="realme" <?php echo in_array('Realme', $selected_brands) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="realme">Realme</label>
+                                </div>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input brand-filter" type="checkbox" value="Apple" id="apple">
-                                <label class="form-check-label" for="apple">Apple</label>
+                            
+                            <!-- Filter by Price -->
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-2">Harga</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="price" value="0-3000000" id="price1" <?php echo $selected_price === '0-3000000' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="price1">Rp 1 - 3 Juta</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="price" value="3000000-7000000" id="price2" <?php echo $selected_price === '3000000-7000000' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="price2">Rp 3 - 7 Juta</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="price" value="7000000-15000000" id="price3" <?php echo $selected_price === '7000000-15000000' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="price3">Rp 7 - 15 Juta</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="price" value="15000000" id="price4" <?php echo $selected_price === '15000000' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="price4">Rp 15+ Juta</label>
+                                </div>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input brand-filter" type="checkbox" value="Xiaomi" id="xiaomi">
-                                <label class="form-check-label" for="xiaomi">Xiaomi</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input brand-filter" type="checkbox" value="Oppo" id="oppo">
-                                <label class="form-check-label" for="oppo">Oppo</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input brand-filter" type="checkbox" value="Realme" id="realme">
-                                <label class="form-check-label" for="realme">Realme</label>
-                            </div>
-                        </div>
-                        
-                        <!-- Filter by Price -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold mb-2">Harga</h6>
-                            <div class="form-check">
-                                <input class="form-check-input price-filter" type="radio" name="price" value="0-3000000" id="price1">
-                                <label class="form-check-label" for="price1">Rp 1 - 3 Juta</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input price-filter" type="radio" name="price" value="3000000-7000000" id="price2">
-                                <label class="form-check-label" for="price2">Rp 3 - 7 Juta</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input price-filter" type="radio" name="price" value="7000000-15000000" id="price3">
-                                <label class="form-check-label" for="price3">Rp 7 - 15 Juta</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input price-filter" type="radio" name="price" value="15000000" id="price4">
-                                <label class="form-check-label" for="price4">Rp 15+ Juta</label>
-                            </div>
-                        </div>
 
-                        <!-- Reset Filter Button -->
-                        <button class="btn btn-secondary btn-sm w-100" id="resetFilter">
-                            <i class="bi bi-arrow-counterclockwise"></i> Reset Filter
-                        </button>
+                            <!-- Buttons -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-search"></i> Terapkan Filter
+                                </button>
+                                <a href="list-produk.php" class="btn btn-secondary btn-sm">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Reset Filter
+                                </a>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -95,178 +163,71 @@ include '../includes/header.php';
             <div class="col-lg-9">
                 <!-- Sorting & Info -->
                 <div class="mb-4 d-flex justify-content-between align-items-center">
-                    <p class="mb-0 text-muted">Menampilkan <strong id="productCount">0</strong> produk</p>
-                    <select class="form-select form-select-sm w-auto" id="sortSelect">
-                        <option value="terbaru" selected>Terbaru</option>
-                        <option value="termurah">Harga Terendah</option>
-                        <option value="termahal">Harga Tertinggi</option>
-                        <option value="populer">Paling Populer</option>
-                    </select>
+                    <p class="mb-0 text-muted">Menampilkan <strong><?php echo $total_products; ?></strong> produk</p>
+                    <form method="GET" action="list-produk.php" class="d-flex gap-2">
+                        <!-- Preserve other filters -->
+                        <input type="hidden" name="search" value="<?php echo htmlspecialchars($search_query); ?>">
+                        <input type="hidden" name="price" value="<?php echo htmlspecialchars($selected_price); ?>">
+                        <?php foreach ($selected_brands as $brand): ?>
+                            <input type="hidden" name="brands[]" value="<?php echo htmlspecialchars($brand); ?>">
+                        <?php endforeach; ?>
+                        
+                        <select class="form-select form-select-sm w-auto" name="sort" onchange="this.form.submit();">
+                            <option value="terbaru" <?php echo $sort_by === 'terbaru' ? 'selected' : ''; ?>>Terbaru</option>
+                            <option value="termurah" <?php echo $sort_by === 'termurah' ? 'selected' : ''; ?>>Harga Terendah</option>
+                            <option value="termahal" <?php echo $sort_by === 'termahal' ? 'selected' : ''; ?>>Harga Tertinggi</option>
+                            <option value="populer" <?php echo $sort_by === 'populer' ? 'selected' : ''; ?>>Paling Populer</option>
+                        </select>
+                    </form>
                 </div>
 
                 <!-- Product Grid -->
-                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5" id="productGrid">
-                    <!-- Produk akan dimuat via JavaScript -->
-                    <div class="col-12 text-center py-5">
-                        <p class="text-muted">Loading produk...</p>
-                    </div>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5">
+                    <?php
+                    if ($total_products > 0) {
+                        while ($row = mysqli_fetch_assoc($result)) {
+                            ?>
+                            <div class="col">
+                                <div class="card h-100 shadow-sm border-0 transition-card">
+                                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center position-relative" style="height: 200px;">
+                                        <i class="bi bi-phone text-muted" style="font-size: 3rem;"></i>
+                                        <span class="badge bg-danger position-absolute top-0 end-0 m-2">-15%</span>
+                                    </div>
+                                    
+                                    <div class="card-body">
+                                        <h5 class="card-title fw-bold"><?php echo htmlspecialchars($row['nama_produk']); ?></h5>
+                                        <p class="text-muted small mb-2"><?php echo htmlspecialchars($row['merek']); ?></p>
+                                        
+                                        <div class="mb-2">
+                                            <span class="text-warning">
+                                                <i class="bi bi-star-fill"></i>
+                                                <i class="bi bi-star-fill"></i>
+                                                <i class="bi bi-star-fill"></i>
+                                                <i class="bi bi-star-fill"></i>
+                                                <i class="bi bi-star-half"></i>
+                                            </span>
+                                            <span class="text-muted small">(152)</span>
+                                        </div>
+                                        
+                                        <h6 class="text-primary fw-bold mb-3">Rp <?php echo number_format($row['harga'], 0, ',', '.'); ?></h6>
+                                        
+                                        <div class="d-grid gap-2">
+                                            <a href="detail-produk.php?id=<?php echo $row['id_produk']; ?>" class="btn btn-primary btn-sm">
+                                                <i class="bi bi-cart-plus"></i> Lihat Detail
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php
+                        }
+                    } else {
+                        echo '<div class="col-12"><p class="text-center text-muted py-5">Tidak ada produk yang sesuai dengan filter.</p></div>';
+                    }
+                    ?>
                 </div>
             </div>
         </div>
     </div>
 
 <?php include '../includes/footer.php'; ?>
-
-<script>
-// Store semua produk dari database
-let allProducts = [];
-
-// Load produk dari server saat halaman dibuka
-document.addEventListener('DOMContentLoaded', function() {
-    loadProducts();
-    
-    // Event listener untuk filter
-    document.querySelectorAll('.brand-filter').forEach(checkbox => {
-        checkbox.addEventListener('change', applyFilters);
-    });
-    
-    document.querySelectorAll('.price-filter').forEach(radio => {
-        radio.addEventListener('change', applyFilters);
-    });
-    
-    document.getElementById('searchInput').addEventListener('keyup', applyFilters);
-    document.getElementById('sortSelect').addEventListener('change', applyFilters);
-    document.getElementById('resetFilter').addEventListener('click', resetFilters);
-});
-
-// Load semua produk dari server
-function loadProducts() {
-    fetch('get-produk.php')
-        .then(response => response.json())
-        .then(data => {
-            allProducts = data;
-            applyFilters();
-        })
-        .catch(error => {
-            console.error('Error loading products:', error);
-            document.getElementById('productGrid').innerHTML = '<div class="col-12"><p class="text-danger">Gagal memuat produk</p></div>';
-        });
-}
-
-// Apply filter ke produk
-function applyFilters() {
-    // Get filter values
-    const selectedBrands = Array.from(document.querySelectorAll('.brand-filter:checked')).map(cb => cb.value);
-    const selectedPrice = document.querySelector('.price-filter:checked')?.value || '';
-    const searchText = document.getElementById('searchInput').value.toLowerCase();
-    const sortBy = document.getElementById('sortSelect').value;
-    
-    // Filter produk
-    let filtered = allProducts.filter(product => {
-        // Filter by search
-        if (searchText && !product.nama_produk.toLowerCase().includes(searchText) && 
-            !product.merek.toLowerCase().includes(searchText)) {
-            return false;
-        }
-        
-        // Filter by brand
-        if (selectedBrands.length > 0 && !selectedBrands.includes(product.merek)) {
-            return false;
-        }
-        
-        // Filter by price
-        if (selectedPrice) {
-            const [minPrice, maxPrice] = selectedPrice.split('-').map(p => parseInt(p) || 0);
-            if (maxPrice === 0) { // "15000000" means 15+ juta
-                if (product.harga < minPrice) return false;
-            } else {
-                if (product.harga < minPrice || product.harga > maxPrice) return false;
-            }
-        }
-        
-        return true;
-    });
-    
-    // Sort produk
-    if (sortBy === 'termurah') {
-        filtered.sort((a, b) => a.harga - b.harga);
-    } else if (sortBy === 'termahal') {
-        filtered.sort((a, b) => b.harga - a.harga);
-    } else if (sortBy === 'terbaru') {
-        filtered.sort((a, b) => new Date(b.tanggal_ditambahkan) - new Date(a.tanggal_ditambahkan));
-    }
-    
-    // Display produk
-    displayProducts(filtered);
-}
-
-// Display produk di halaman
-function displayProducts(products) {
-    const productGrid = document.getElementById('productGrid');
-    const productCount = document.getElementById('productCount');
-    
-    if (products.length === 0) {
-        productGrid.innerHTML = '<div class="col-12"><p class="text-center text-muted py-5">Tidak ada produk yang sesuai dengan filter.</p></div>';
-        productCount.textContent = '0';
-        return;
-    }
-    
-    productCount.textContent = products.length;
-    
-    productGrid.innerHTML = products.map(product => `
-        <div class="col">
-            <div class="card h-100 shadow-sm border-0 transition-card">
-                <div class="card-img-top bg-light d-flex align-items-center justify-content-center position-relative" style="height: 200px;">
-                    <i class="bi bi-phone text-muted" style="font-size: 3rem;"></i>
-                    <span class="badge bg-danger position-absolute top-0 end-0 m-2">-15%</span>
-                </div>
-                
-                <div class="card-body">
-                    <h5 class="card-title fw-bold">${escapeHtml(product.nama_produk)}</h5>
-                    <p class="text-muted small mb-2">${escapeHtml(product.merek)}</p>
-                    
-                    <div class="mb-2">
-                        <span class="text-warning">
-                            <i class="bi bi-star-fill"></i>
-                            <i class="bi bi-star-fill"></i>
-                            <i class="bi bi-star-fill"></i>
-                            <i class="bi bi-star-fill"></i>
-                            <i class="bi bi-star-half"></i>
-                        </span>
-                        <span class="text-muted small">(152)</span>
-                    </div>
-                    
-                    <h6 class="text-primary fw-bold mb-3">Rp ${formatCurrency(product.harga)}</h6>
-                    
-                    <div class="d-grid gap-2">
-                        <a href="detail-produk.php?id=${product.id_produk}" class="btn btn-primary btn-sm">
-                            <i class="bi bi-cart-plus"></i> Lihat Detail
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Reset filter
-function resetFilters() {
-    document.querySelectorAll('.brand-filter').forEach(cb => cb.checked = false);
-    document.querySelectorAll('.price-filter').forEach(rb => rb.checked = false);
-    document.getElementById('searchInput').value = '';
-    document.getElementById('sortSelect').value = 'terbaru';
-    applyFilters();
-}
-
-// Format currency
-function formatCurrency(value) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value).replace('Rp', '').trim();
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-</script>
