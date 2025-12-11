@@ -43,21 +43,56 @@
                             <i class="bi bi-phone"></i> Produk
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="<?php echo isset($login_url) ? $login_url : 'user/login.php'; ?>">
-                            <i class="bi bi-box-arrow-in-right"></i> Login
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="<?php echo isset($register_url) ? $register_url : 'user/register.php'; ?>">
-                            <i class="bi bi-person-plus"></i> Register
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="<?php echo isset($keranjang_url) ? $keranjang_url : 'transaksi/keranjang.php'; ?>">
-                            <i class="bi bi-cart3"></i> <span class="badge bg-danger">0</span>
-                        </a>
-                    </li>
+                    
+                    <!-- Menu Jika User Sudah Login -->
+                    <?php if (is_logged_in()): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-circle"></i> 
+                                <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li>
+                                    <a class="dropdown-item" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>user/profil.php">
+                                        <i class="bi bi-person"></i> Profil Saya
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>user/pesanan.php">
+                                        <i class="bi bi-box-seam"></i> Pesanan Saya
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>user/logout.php">
+                                        <i class="bi bi-box-arrow-right"></i> Logout
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>transaksi/keranjang.php">
+                                <i class="bi bi-cart3"></i> <span class="badge bg-danger">0</span>
+                            </a>
+                        </li>
+                    <!-- Menu Jika User Belum Login -->
+                    <?php else: ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?php echo isset($login_url) ? $login_url : 'user/login.php'; ?>">
+                                <i class="bi bi-box-arrow-in-right"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?php echo isset($register_url) ? $register_url : 'user/register.php'; ?>">
+                                <i class="bi bi-person-plus"></i> Register
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?php echo isset($keranjang_url) ? $keranjang_url : 'transaksi/keranjang.php'; ?>">
+                                <i class="bi bi-cart3"></i> <span class="badge bg-danger">0</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
                 </ul>
             </div>
         </div>
