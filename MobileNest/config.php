@@ -2,6 +2,7 @@
 /**
  * MobileNest - Database Configuration & Global Setup
  * Koneksi MySQLi dan konfigurasi umum untuk seluruh aplikasi
+ * Updated: Database name changed to mobilenest_db
  */
 
 // Prevent direct access
@@ -13,8 +14,8 @@ if (basename($_SERVER['PHP_SELF']) === 'config.php') {
 // ===== DATABASE CONNECTION =====
 $db_host = 'localhost';
 $db_user = 'root';
-$db_pass = '';
-$db_name = 'mobilenest';
+$db_pass = '';  // Password kosong jika default XAMPP
+$db_name = 'mobilenest_db';  // ✅ Updated to match actual database name
 
 // Create MySQLi connection
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
@@ -77,7 +78,7 @@ function is_logged_in() {
  */
 function require_login($is_admin = false) {
     if (!is_logged_in()) {
-        header('Location: ' . SITE_URL . '/login.php');
+        header('Location: ' . SITE_URL . '/user/login.php');
         exit;
     }
     if ($is_admin && !is_admin()) {
