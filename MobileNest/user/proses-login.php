@@ -11,7 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $sql = "SELECT * FROM users 
+    // Query user berdasarkan email atau username
+    $sql = "SELECT id_user, nama_lengkap, email, username, password FROM users 
             WHERE username='$username_or_email' OR email='$username_or_email' 
             LIMIT 1";
     $result = mysqli_query($conn, $sql);
@@ -19,14 +20,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mysqli_num_rows($result) === 1) {
         $user = mysqli_fetch_assoc($result);
 
-        if (password_verify($password, $user['password'])) { // cek hash[web:190][web:201]
-            $_SESSION['id_user']      = $user['id_user'];
-            $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
-            $_SESSION['username']     = $user['username'];
-            $_SESSION['email']        = $user['email'];
-            $_SESSION['role']         = $user['status'] ?? 'user';
+        // Verifikasi password (hashed dengan password_hash)
+        if (password_verify($password, $user['password'])) {
+            // PENTING: Gunakan session key 'user' (bukan 'id_user') agar sesuai dengan config.php
+            $_SESSION['user']       = $user['id_user'];        // ID user
+            $_SESSION['user_name']  = $user['nama_lengkap'];   // Nama lengkap untuk ditampilkan
+            $_SESSION['user_email'] = $user['email'];          // Email
+            $_SESSION['username']   = $user['username'];       // Username
+            $_SESSION['role']       = 'user';                  // Role (customer)
 
+            // Success message
             $_SESSION['success'] = "Login berhasil. Selamat datang, " . $user['nama_lengkap'] . "!";
+            
+            // Redirect ke halaman sebelumnya atau home
             header('Location: ../index.php');
             exit;
         } else {
@@ -35,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     } else {
-        $_SESSION['error'] = "Akun tidak ditemukan.";
+        $_SESSION['error'] = "Username atau email tidak ditemukan.";
         header('Location: login.php');
         exit;
     }
@@ -43,3 +49,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: login.php');
     exit;
 }
+?>
