@@ -1,383 +1,430 @@
 <?php
-// ...existing code...
-session_start();
-require_once __DIR__ . '/config.php';
-// atau dari subfolder admin:
-require_once __DIR__ . '/../config.php';
+/**
+ * ============================================
+ * FILE: dashboard.php
+ * PURPOSE: Admin Dashboard with Analytics
+ * LOCATION: MobileNest/admin/dashboard.php
+ * ============================================
+ */
 
-// simple auth check (sesuaikan nama session admin jika berbeda)
-if (!isset($_SESSION['admin']) && !isset($_SESSION['user'])) {
-    header('Location: ../login.php');
-    exit;
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// koneksi mysqli dari koneksi.php diharapkan tersedia sebagai $conn
-if (!isset($conn) || !$conn instanceof mysqli) {
-    // fallback sederhana
-    $conn = new mysqli('localhost', 'root', '', 'mobilenest');
-    if ($conn->connect_errno) {
-        die('Database connection failed: ' . $conn->connect_error);
-    }
+require_once '../includes/auth-check.php';
+require_admin_login();
+require_once '../config.php';
+
+$admin_id = $_SESSION['admin'];
+$stats = [];
+$errors = [];
+
+// ========================================
+// GET STATISTICS
+// ========================================
+
+// Total Orders
+$total_orders_sql = "SELECT COUNT(*) as total FROM transaksi";
+$result = $conn->query($total_orders_sql);
+$stats['total_orders'] = $result->fetch_assoc()['total'] ?? 0;
+
+// Total Sales This Month
+$current_month = date('Y-m');
+$total_sales_sql = "SELECT COALESCE(SUM(total_harga), 0) as total FROM transaksi WHERE DATE_FORMAT(tanggal_transaksi, '%Y-%m') = ?";
+$stmt = $conn->prepare($total_sales_sql);
+$stmt->bind_param('s', $current_month);
+$stmt->execute();
+$stats['total_sales'] = $stmt->get_result()->fetch_assoc()['total'] ?? 0;
+$stmt->close();
+
+// Total Users
+$total_users_sql = "SELECT COUNT(*) as total FROM users WHERE role = 'user'";
+$result = $conn->query($total_users_sql);
+$stats['total_users'] = $result->fetch_assoc()['total'] ?? 0;
+
+// Total Products
+$total_products_sql = "SELECT COUNT(*) as total FROM produk";
+$result = $conn->query($total_products_sql);
+$stats['total_products'] = $result->fetch_assoc()['total'] ?? 0;
+
+// Status Breakdown
+$status_breakdown_sql = "SELECT status_pesanan, COUNT(*) as count FROM transaksi GROUP BY status_pesanan";
+$result = $conn->query($status_breakdown_sql);
+$stats['status_breakdown'] = [];
+while ($row = $result->fetch_assoc()) {
+    $stats['status_breakdown'][$row['status_pesanan']] = $row['count'];
 }
 
-// sanitasi dan default tanggal (30 hari terakhir)
-$start_date = isset($_GET['start_date']) && $_GET['start_date'] !== '' ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
-$end_date   = isset($_GET['end_date']) && $_GET['end_date'] !== '' ? $_GET['end_date'] : date('Y-m-d');
-
-// normalize waktu untuk range inclusif
-$start_datetime = $start_date . ' 00:00:00';
-$end_datetime   = $end_date . ' 23:59:59';
-
-// prepare statements untuk ringkasan
-$countStmt = $conn->prepare("SELECT COUNT(*) FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ?");
-$sumStmt   = $conn->prepare("SELECT IFNULL(SUM(total_harga),0) FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ?");
-$listStmt  = $conn->prepare("SELECT id_transaksi, id_user, total_harga, status_pesanan, metode_pembayaran, alamat_pengiriman, no_resi, tanggal_transaksi, tanggal_diperbarui FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ? ORDER BY tanggal_transaksi DESC");
-
-// bind & execute
-$countStmt->bind_param('ss', $start_datetime, $end_datetime);
-$countStmt->execute();
-$countStmt->bind_result($totalTransactions);
-$countStmt->fetch();
-$countStmt->close();
-
-$sumStmt->bind_param('ss', $start_datetime, $end_datetime);
-$sumStmt->execute();
-$sumStmt->bind_result($totalRevenue);
-$sumStmt->fetch();
-$sumStmt->close();
-
-// handle CSV export
-if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    $listStmt->bind_param('ss', $start_datetime, $end_datetime);
-    $listStmt->execute();
-    $res = $listStmt->get_result();
-
-    // send CSV headers
-    $filename = 'laporan_transaksi_' . $start_date . '_to_' . $end_date . '.csv';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    $out = fopen('php://output', 'w');
-
-    // header row
-    fputcsv($out, ['ID Transaksi','ID User','Tanggal Transaksi','Tanggal Diperbarui','Total Harga','Status Pesanan','Metode Pembayaran','No Resi','Alamat Pengiriman']);
-
-    while ($row = $res->fetch_assoc()) {
-        fputcsv($out, [
-            $row['id_transaksi'],
-            $row['id_user'],
-            $row['tanggal_transaksi'],
-            $row['tanggal_diperbarui'],
-            $row['total_harga'],
-            $row['status_pesanan'],
-            $row['metode_pembayaran'],
-            $row['no_resi'],
-            $row['alamat_pengiriman'],
-        ]);
-    }
-    fclose($out);
-    exit;
+// Recent Orders (5)
+$recent_orders_sql = "SELECT t.id_transaksi, t.tanggal_transaksi, t.total_harga, t.status_pesanan, u.nama_lengkap FROM transaksi t JOIN users u ON t.id_user = u.id_user ORDER BY t.tanggal_transaksi DESC LIMIT 5";
+$result = $conn->query($recent_orders_sql);
+$stats['recent_orders'] = [];
+while ($row = $result->fetch_assoc()) {
+    $stats['recent_orders'][] = $row;
 }
 
-// otherwise fetch list for display (paginated simple: limit 100)
-$listStmt = $conn->prepare("SELECT id_transaksi, id_user, total_harga, status_pesanan, metode_pembayaran, alamat_pengiriman, no_resi, tanggal_transaksi, tanggal_diperbarui FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ? ORDER BY tanggal_transaksi DESC LIMIT 1000");
-$listStmt->bind_param('ss', $start_datetime, $end_datetime);
-$listStmt->execute();
-$result = $listStmt->get_result();
-
+// Low Stock Products (stok <= 5)
+$low_stock_sql = "SELECT id_produk, nama_produk, stok FROM produk WHERE stok <= 5 ORDER BY stok ASC";
+$result = $conn->query($low_stock_sql);
+$stats['low_stock'] = [];
+while ($row = $result->fetch_assoc()) {
+    $stats['low_stock'][] = $row;
+}
 ?>
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Laporan Transaksi - MobileNest Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - MobileNest</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #007bff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .dashboard-container {
+            padding: 40px 20px;
+        }
+
+        .page-header {
+            background: white;
+            border-radius: 20px;
+            padding: 35px 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .page-header h1 {
+            font-size: 32px;
+            color: #2c3e50;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .page-header p {
+            color: #7f8c8d;
+            margin: 10px 0 0 0;
+            font-size: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: var(--card-shadow);
+            border-top: 4px solid var(--primary);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-card.success { border-top-color: var(--success); }
+        .stat-card.warning { border-top-color: var(--warning); }
+        .stat-card.danger { border-top-color: var(--danger); }
+        .stat-card.info { border-top-color: var(--info); }
+
+        .stat-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .stat-card.success .stat-icon { color: var(--success); }
+        .stat-card.warning .stat-icon { color: var(--warning); }
+        .stat-card.danger .stat-icon { color: var(--danger); }
+        .stat-card.info .stat-icon { color: var(--info); }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .content-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-diproses { background: #cfe2ff; color: #084298; }
+        .status-dikirim { background: #d1ecf1; color: #0c5460; }
+        .status-selesai { background: #d1e7dd; color: #0f5132; }
+        .status-dibatalkan { background: #f8d7da; color: #842029; }
+
+        .table-custom {
+            margin: 0;
+        }
+
+        .table-custom thead th {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: none;
+            color: #2c3e50;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 15px 10px;
+        }
+
+        .table-custom tbody td {
+            padding: 15px 10px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+
+        .table-custom tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .alert-custom {
+            border: none;
+            border-left: 4px solid;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .alert-warning-custom {
+            background: #fff8e1;
+            color: #856404;
+            border-left-color: #ffc107;
+        }
+
+        .progress-bar-custom {
+            background: linear-gradient(135deg, var(--primary), #764ba2);
+            height: 8px;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .page-header {
+                padding: 20px 15px;
+            }
+
+            .page-header h1 {
+                font-size: 24px;
+            }
+
+            .stat-value {
+                font-size: 24px;
+            }
+
+            .content-card {
+                padding: 20px 15px;
+            }
+        }
+    </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="dashboard.php">MobileNest Admin</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="kelola-produk.php">Kelola Produk</a></li>
-        <li class="nav-item"><a class="nav-link" href="kelola-transaksi.php">Transaksi</a></li>
-        <li class="nav-item"><a class="nav-link active" href="laporan.php">Laporan</a></li>
-        <li class="nav-item"><a class="nav-link text-danger" href="../logout.php">Logout</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
+    <?php include '../header.php'; ?>
 
-<main class="container my-4">
-  <h3>Laporan Transaksi</h3>
+    <div class="dashboard-container">
+        <div class="container-fluid">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1>
+                    <i class="fas fa-chart-line"></i> Dashboard Admin
+                </h1>
+                <p>Kelola dan pantau seluruh aktivitas toko Anda</p>
+            </div>
 
-  <form class="row g-2 align-items-end mb-3" method="get" action="laporan.php">
-    <div class="col-auto">
-      <label class="form-label">Dari</label>
-      <input type="date" name="start_date" class="form-control" value="<?= htmlspecialchars($start_date) ?>">
-    </div>
-    <div class="col-auto">
-      <label class="form-label">Sampai</label>
-      <input type="date" name="end_date" class="form-control" value="<?= htmlspecialchars($end_date) ?>">
-    </div>
-    <div class="col-auto">
-      <button type="submit" class="btn btn-primary">Filter</button>
-      <a href="laporan.php" class="btn btn-outline-secondary">Reset</a>
-    </div>
-    <div class="col-auto ms-auto text-end">
-      <a href="laporan.php?export=csv&start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>" class="btn btn-success">Export CSV</a>
-    </div>
-  </form>
+            <!-- Statistics Cards -->
+            <div class="row">
+                <div class="col-md-6 col-lg-3">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
+                        <div class="stat-label">Total Pesanan</div>
+                        <div class="stat-value"><?php echo $stats['total_orders']; ?></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="stat-card success">
+                        <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="stat-label">Penjualan Bulan Ini</div>
+                        <div class="stat-value">Rp <?php echo number_format($stats['total_sales'], 0, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="stat-card warning">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-label">Total User</div>
+                        <div class="stat-value"><?php echo $stats['total_users']; ?></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="stat-card info">
+                        <div class="stat-icon"><i class="fas fa-box"></i></div>
+                        <div class="stat-label">Total Produk</div>
+                        <div class="stat-value"><?php echo $stats['total_products']; ?></div>
+                    </div>
+                </div>
+            </div>
 
-  <div class="row mb-3">
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6>Total Transaksi</h6>
-          <p class="fs-4 mb-0"><?= (int)$totalTransactions ?></p>
+            <div class="row">
+                <!-- Status Breakdown -->
+                <div class="col-lg-6">
+                    <div class="content-card">
+                        <div class="card-title">
+                            <i class="fas fa-chart-pie"></i> Breakdown Status Pesanan
+                        </div>
+                        <?php foreach ($stats['status_breakdown'] as $status => $count): ?>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="status-badge status-<?php echo strtolower(str_replace(' ', '', $status)); ?>">
+                                        <?php echo htmlspecialchars($status); ?>
+                                    </span>
+                                    <strong><?php echo $count; ?> pesanan</strong>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar-custom" style="width: <?php echo ($count / $stats['total_orders']) * 100; ?>%"></div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Low Stock Alert -->
+                <div class="col-lg-6">
+                    <div class="content-card">
+                        <div class="card-title">
+                            <i class="fas fa-exclamation-triangle"></i> Produk Stok Rendah
+                        </div>
+                        <?php if (!empty($stats['low_stock'])): ?>
+                            <div class="alert-custom alert-warning-custom">
+                                <i class="fas fa-info-circle"></i> <strong><?php echo count($stats['low_stock']); ?> produk</strong> memiliki stok kurang dari 5
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-custom">
+                                    <thead>
+                                        <tr>
+                                            <th>Nama Produk</th>
+                                            <th class="text-center">Stok</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($stats['low_stock'] as $product): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($product['nama_produk']); ?></td>
+                                                <td class="text-center">
+                                                    <strong style="color: #dc3545;"><?php echo $product['stok']; ?></strong>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div style="text-align: center; padding: 30px; color: #7f8c8d;">
+                                <i class="fas fa-check-circle" style="font-size: 40px; color: #28a745; margin-bottom: 10px; display: block;"></i>
+                                <p>Semua produk memiliki stok yang cukup</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="content-card">
+                        <div class="card-title">
+                            <i class="fas fa-history"></i> Pesanan Terbaru
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-custom">
+                                <thead>
+                                    <tr>
+                                        <th>ID Pesanan</th>
+                                        <th>User</th>
+                                        <th>Tanggal</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($stats['recent_orders'])): ?>
+                                        <?php foreach ($stats['recent_orders'] as $order): ?>
+                                            <tr>
+                                                <td><strong>#<?php echo $order['id_transaksi']; ?></strong></td>
+                                                <td><?php echo htmlspecialchars(substr($order['nama_lengkap'], 0, 25)); ?></td>
+                                                <td><?php echo date('d M Y', strtotime($order['tanggal_transaksi'])); ?></td>
+                                                <td><strong>Rp <?php echo number_format($order['total_harga'], 0, ',', '.'); ?></strong></td>
+                                                <td>
+                                                    <span class="status-badge status-<?php echo strtolower(str_replace(' ', '', $order['status_pesanan'])); ?>">
+                                                        <?php echo htmlspecialchars($order['status_pesanan']); ?>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">
+                                                <i class="fas fa-inbox" style="font-size: 30px;"></i>
+                                                <p>Belum ada pesanan</p>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6>Total Pendapatan</h6>
-          <p class="fs-4 mb-0">Rp <?= number_format((float)$totalRevenue,0,',','.') ?></p>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <div class="table-responsive">
-    <table class="table table-striped table-bordered">
-      <thead class="table-light">
-        <tr>
-          <th>ID</th>
-          <th>ID User</th>
-          <th>Tanggal Transaksi</th>
-          <th>Tanggal Diperbarui</th>
-          <th>Total Harga</th>
-          <th>Status</th>
-          <th>Metode</th>
-          <th>No Resi</th>
-          <th>Alamat Pengiriman</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if ($result->num_rows === 0): ?>
-          <tr><td colspan="9" class="text-center">Tidak ada transaksi pada rentang waktu ini.</td></tr>
-        <?php else: ?>
-          <?php while ($row = $result->fetch_assoc()): ?>
-            <tr>
-              <td><?= htmlspecialchars($row['id_transaksi']) ?></td>
-              <td><?= htmlspecialchars($row['id_user']) ?></td>
-              <td><?= htmlspecialchars($row['tanggal_transaksi']) ?></td>
-              <td><?= htmlspecialchars($row['tanggal_diperbarui']) ?></td>
-              <td>Rp <?= number_format((float)$row['total_harga'],0,',','.') ?></td>
-              <td><?= htmlspecialchars($row['status_pesanan']) ?></td>
-              <td><?= htmlspecialchars($row['metode_pembayaran']) ?></td>
-              <td><?= htmlspecialchars($row['no_resi'] ?? '-') ?></td>
-              <td style="max-width:300px;white-space:normal;"><?= htmlspecialchars($row['alamat_pengiriman']) ?></td>
-            </tr>
-          <?php endwhile; ?>
-        <?php endif; ?>
-      </tbody>
-    </table>
-  </div>
-  <p class="text-muted">Catatan: daftar dibatasi 1000 baris untuk tampilan. Gunakan export CSV untuk mengambil data lengkap.</p>
-</main>
+    <?php include '../footer.php'; ?>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-```// filepath: c:\xampp\htdocs\MobileNest\admin\laporan.php
-// ...existing code...
-<?php
-session_start();
-require_once __DIR__ . '/../koneksi.php';
-
-// simple auth check (sesuaikan nama session admin jika berbeda)
-if (!isset($_SESSION['admin']) && !isset($_SESSION['user'])) {
-    header('Location: ../login.php');
-    exit;
-}
-
-// koneksi mysqli dari koneksi.php diharapkan tersedia sebagai $conn
-if (!isset($conn) || !$conn instanceof mysqli) {
-    // fallback sederhana
-    $conn = new mysqli('localhost', 'root', '', 'mobilenest');
-    if ($conn->connect_errno) {
-        die('Database connection failed: ' . $conn->connect_error);
-    }
-}
-
-// sanitasi dan default tanggal (30 hari terakhir)
-$start_date = isset($_GET['start_date']) && $_GET['start_date'] !== '' ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
-$end_date   = isset($_GET['end_date']) && $_GET['end_date'] !== '' ? $_GET['end_date'] : date('Y-m-d');
-
-// normalize waktu untuk range inclusif
-$start_datetime = $start_date . ' 00:00:00';
-$end_datetime   = $end_date . ' 23:59:59';
-
-// prepare statements untuk ringkasan
-$countStmt = $conn->prepare("SELECT COUNT(*) FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ?");
-$sumStmt   = $conn->prepare("SELECT IFNULL(SUM(total_harga),0) FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ?");
-$listStmt  = $conn->prepare("SELECT id_transaksi, id_user, total_harga, status_pesanan, metode_pembayaran, alamat_pengiriman, no_resi, tanggal_transaksi, tanggal_diperbarui FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ? ORDER BY tanggal_transaksi DESC");
-
-// bind & execute
-$countStmt->bind_param('ss', $start_datetime, $end_datetime);
-$countStmt->execute();
-$countStmt->bind_result($totalTransactions);
-$countStmt->fetch();
-$countStmt->close();
-
-$sumStmt->bind_param('ss', $start_datetime, $end_datetime);
-$sumStmt->execute();
-$sumStmt->bind_result($totalRevenue);
-$sumStmt->fetch();
-$sumStmt->close();
-
-// handle CSV export
-if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    $listStmt->bind_param('ss', $start_datetime, $end_datetime);
-    $listStmt->execute();
-    $res = $listStmt->get_result();
-
-    // send CSV headers
-    $filename = 'laporan_transaksi_' . $start_date . '_to_' . $end_date . '.csv';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    $out = fopen('php://output', 'w');
-
-    // header row
-    fputcsv($out, ['ID Transaksi','ID User','Tanggal Transaksi','Tanggal Diperbarui','Total Harga','Status Pesanan','Metode Pembayaran','No Resi','Alamat Pengiriman']);
-
-    while ($row = $res->fetch_assoc()) {
-        fputcsv($out, [
-            $row['id_transaksi'],
-            $row['id_user'],
-            $row['tanggal_transaksi'],
-            $row['tanggal_diperbarui'],
-            $row['total_harga'],
-            $row['status_pesanan'],
-            $row['metode_pembayaran'],
-            $row['no_resi'],
-            $row['alamat_pengiriman'],
-        ]);
-    }
-    fclose($out);
-    exit;
-}
-
-// otherwise fetch list for display (paginated simple: limit 100)
-$listStmt = $conn->prepare("SELECT id_transaksi, id_user, total_harga, status_pesanan, metode_pembayaran, alamat_pengiriman, no_resi, tanggal_transaksi, tanggal_diperbarui FROM transaksi WHERE tanggal_transaksi BETWEEN ? AND ? ORDER BY tanggal_transaksi DESC LIMIT 1000");
-$listStmt->bind_param('ss', $start_datetime, $end_datetime);
-$listStmt->execute();
-$result = $listStmt->get_result();
-
-?>
-<!doctype html>
-<html lang="id">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Laporan Transaksi - MobileNest Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="dashboard.php">MobileNest Admin</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="kelola-produk.php">Kelola Produk</a></li>
-        <li class="nav-item"><a class="nav-link" href="kelola-transaksi.php">Transaksi</a></li>
-        <li class="nav-item"><a class="nav-link active" href="laporan.php">Laporan</a></li>
-        <li class="nav-item"><a class="nav-link text-danger" href="../logout.php">Logout</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
-
-<main class="container my-4">
-  <h3>Laporan Transaksi</h3>
-
-  <form class="row g-2 align-items-end mb-3" method="get" action="laporan.php">
-    <div class="col-auto">
-      <label class="form-label">Dari</label>
-      <input type="date" name="start_date" class="form-control" value="<?= htmlspecialchars($start_date) ?>">
-    </div>
-    <div class="col-auto">
-      <label class="form-label">Sampai</label>
-      <input type="date" name="end_date" class="form-control" value="<?= htmlspecialchars($end_date) ?>">
-    </div>
-    <div class="col-auto">
-      <button type="submit" class="btn btn-primary">Filter</button>
-      <a href="laporan.php" class="btn btn-outline-secondary">Reset</a>
-    </div>
-    <div class="col-auto ms-auto text-end">
-      <a href="laporan.php?export=csv&start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>" class="btn btn-success">Export CSV</a>
-    </div>
-  </form>
-
-  <div class="row mb-3">
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6>Total Transaksi</h6>
-          <p class="fs-4 mb-0"><?= (int)$totalTransactions ?></p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6>Total Pendapatan</h6>
-          <p class="fs-4 mb-0">Rp <?= number_format((float)$totalRevenue,0,',','.') ?></p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="table-responsive">
-    <table class="table table-striped table-bordered">
-      <thead class="table-light">
-        <tr>
-          <th>ID</th>
-          <th>ID User</th>
-          <th>Tanggal Transaksi</th>
-          <th>Tanggal Diperbarui</th>
-          <th>Total Harga</th>
-          <th>Status</th>
-          <th>Metode</th>
-          <th>No Resi</th>
-          <th>Alamat Pengiriman</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if ($result->num_rows === 0): ?>
-          <tr><td colspan="9" class="text-center">Tidak ada transaksi pada rentang waktu ini.</td></tr>
-        <?php else: ?>
-          <?php while ($row = $result->fetch_assoc()): ?>
-            <tr>
-              <td><?= htmlspecialchars($row['id_transaksi']) ?></td>
-              <td><?= htmlspecialchars($row['id_user']) ?></td>
-              <td><?= htmlspecialchars($row['tanggal_transaksi']) ?></td>
-              <td><?= htmlspecialchars($row['tanggal_diperbarui']) ?></td>
-              <td>Rp <?= number_format((float)$row['total_harga'],0,',','.') ?></td>
-              <td><?= htmlspecialchars($row['status_pesanan']) ?></td>
-              <td><?= htmlspecialchars($row['metode_pembayaran']) ?></td>
-              <td><?= htmlspecialchars($row['no_resi'] ?? '-') ?></td>
-              <td style="max-width:300px;white-space:normal;"><?= htmlspecialchars($row['alamat_pengiriman']) ?></td>
-            </tr>
-          <?php endwhile; ?>
-        <?php endif; ?>
-      </tbody>
-    </table>
-  </div>
-  <p class="text-muted">Catatan: daftar dibatasi 1000 baris untuk tampilan. Gunakan export CSV untuk mengambil data lengkap.</p>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
