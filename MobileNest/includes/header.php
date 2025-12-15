@@ -1,3 +1,7 @@
+<?php
+// CRITICAL FIX: Include config to access is_logged_in() function and session variables
+require_once dirname(__DIR__) . '/config.php';
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -20,8 +24,8 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
         <div class="container">
             <!-- Logo & Brand -->
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="<?php echo isset($home_url) ? $home_url : 'index.php'; ?>">
-                <img src="<?php echo isset($logo_path) ? $logo_path : 'assets/images/logo.jpg'; ?>" alt="MobileNest Logo" height="40" class="me-2">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="<?php echo SITE_URL; ?>/index.php">
+                <img src="<?php echo SITE_URL; ?>/assets/images/logo.jpg" alt="MobileNest Logo" height="40" class="me-2">
                 <span class="text-primary">MobileNest</span>
             </a>
             
@@ -34,12 +38,12 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="<?php echo isset($home_url) ? $home_url : 'index.php'; ?>">
+                        <a class="nav-link active" href="<?php echo SITE_URL; ?>/index.php">
                             <i class="bi bi-house"></i> Home
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="<?php echo isset($produk_url) ? $produk_url : 'produk/list-produk.php'; ?>">
+                        <a class="nav-link" href="<?php echo SITE_URL; ?>/produk/list-produk.php">
                             <i class="bi bi-phone"></i> Produk
                         </a>
                     </li>
@@ -53,43 +57,45 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                 <li>
-                                    <a class="dropdown-item" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>user/profil.php">
+                                    <a class="dropdown-item" href="<?php echo SITE_URL; ?>/user/profil.php">
                                         <i class="bi bi-person"></i> Profil Saya
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>user/pesanan.php">
+                                    <a class="dropdown-item" href="<?php echo SITE_URL; ?>/user/pesanan.php">
                                         <i class="bi bi-box-seam"></i> Pesanan Saya
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
-                                    <a class="dropdown-item text-danger" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>user/logout.php">
+                                    <a class="dropdown-item text-danger" href="<?php echo SITE_URL; ?>/user/logout.php">
                                         <i class="bi bi-box-arrow-right"></i> Logout
                                     </a>
                                 </li>
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? '../' : ''; ?>transaksi/keranjang.php">
-                                <i class="bi bi-cart3"></i> <span class="badge bg-danger">0</span>
+                            <a class="nav-link" href="<?php echo SITE_URL; ?>/transaksi/keranjang.php">
+                                <i class="bi bi-cart3"></i> 
+                                <span class="badge bg-danger"><?php echo !empty($_SESSION['cart']) ? count($_SESSION['cart']) : 0; ?></span>
                             </a>
                         </li>
                     <!-- Menu Jika User Belum Login -->
                     <?php else: ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?php echo isset($login_url) ? $login_url : 'user/login.php'; ?>">
+                            <a class="nav-link" href="<?php echo SITE_URL; ?>/user/login.php">
                                 <i class="bi bi-box-arrow-in-right"></i> Login
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?php echo isset($register_url) ? $register_url : 'user/register.php'; ?>">
+                            <a class="nav-link" href="<?php echo SITE_URL; ?>/user/register.php">
                                 <i class="bi bi-person-plus"></i> Register
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?php echo isset($keranjang_url) ? $keranjang_url : 'transaksi/keranjang.php'; ?>">
-                                <i class="bi bi-cart3"></i> <span class="badge bg-danger">0</span>
+                            <a class="nav-link" href="<?php echo SITE_URL; ?>/transaksi/keranjang.php">
+                                <i class="bi bi-cart3"></i> 
+                                <span class="badge bg-danger"><?php echo !empty($_SESSION['cart']) ? count($_SESSION['cart']) : 0; ?></span>
                             </a>
                         </li>
                     <?php endif; ?>
