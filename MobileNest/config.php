@@ -46,7 +46,7 @@ define('ADMIN_PATH', __DIR__ . '/admin');
 define('UPLOADS_PATH', __DIR__ . '/uploads');
 
 // ===== HELPER FUNCTIONS - UTILITY ONLY =====
-// NOTE: Auth & Log functions are in includes/auth-check.php
+// NOTE: Auth, Log, and CSRF token functions are in includes/auth-check.php
 
 /**
  * Sanitize input to prevent XSS
@@ -155,23 +155,6 @@ function upload_file($file_input, $allowed_types = ['jpg', 'jpeg', 'png', 'gif']
     }
 
     return ['success' => false, 'message' => 'Upload failed'];
-}
-
-/**
- * Generate CSRF token
- */
-function generate_csrf_token() {
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
-}
-
-/**
- * Verify CSRF token
- */
-function verify_csrf_token($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
 
 /**
