@@ -3,6 +3,9 @@
  * MobileNest - Database Configuration & Global Setup
  * Koneksi MySQLi dan konfigurasi umum untuk seluruh aplikasi
  * Updated: Database name changed to mobilenest_db
+ * 
+ * NOTE: Authentication functions sudah dipindah ke includes/auth-check.php
+ * Jangan duplikasi fungsi di sini!
  */
 
 // Prevent direct access
@@ -42,7 +45,8 @@ define('SITE_URL', 'http://localhost/MobileNest');
 define('ADMIN_PATH', __DIR__ . '/admin');
 define('UPLOADS_PATH', __DIR__ . '/uploads');
 
-// ===== HELPER FUNCTIONS =====
+// ===== HELPER FUNCTIONS - UTILITY ONLY =====
+// NOTE: Auth functions are in includes/auth-check.php
 
 /**
  * Sanitize input to prevent XSS
@@ -56,56 +60,6 @@ function sanitize_input($data) {
  */
 function format_rupiah($amount) {
     return 'Rp ' . number_format((float)$amount, 0, ',', '.');
-}
-
-/**
- * Check if user is admin
- */
-function is_admin() {
-    return isset($_SESSION['admin']) && !empty($_SESSION['admin']);
-}
-
-/**
- * Check if user is logged in
- */
-function is_logged_in() {
-    return (isset($_SESSION['admin']) && !empty($_SESSION['admin'])) || 
-           (isset($_SESSION['user']) && !empty($_SESSION['user']));
-}
-
-/**
- * Redirect to login if not authenticated
- */
-function require_login($is_admin = false) {
-    if (!is_logged_in()) {
-        header('Location: ' . SITE_URL . '/user/login.php');
-        exit;
-    }
-    if ($is_admin && !is_admin()) {
-        header('Location: ' . SITE_URL . '/index.php');
-        exit;
-    }
-}
-
-/**
- * Get user info from session
- */
-function get_user_info() {
-    if (isset($_SESSION['admin'])) {
-        return [
-            'id' => $_SESSION['admin'],
-            'role' => 'admin',
-            'username' => $_SESSION['admin_username'] ?? 'Admin'
-        ];
-    }
-    if (isset($_SESSION['user'])) {
-        return [
-            'id' => $_SESSION['user'],
-            'role' => 'user',
-            'username' => $_SESSION['user_name'] ?? 'User'
-        ];
-    }
-    return null;
 }
 
 /**
