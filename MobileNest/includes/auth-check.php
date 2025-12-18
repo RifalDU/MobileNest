@@ -206,21 +206,6 @@ function getBaseUrl() {
 }
 
 /**
- * 📋 LOG ACTIVITY (optional)
- * Catat setiap aktivitas penting untuk audit
- */
-function log_activity($action, $details, $conn) {
-    $user_id = get_user_id();
-    $role = get_user_role();
-    $ip = $_SERVER['REMOTE_ADDR'];
-    $timestamp = date('Y-m-d H:i:s');
-    
-    // TODO: Buat tabel activity_log untuk audit trail
-    // INSERT INTO activity_log (user_id, role, action, details, ip, timestamp)
-    // VALUES (?, ?, ?, ?, ?, ?)
-}
-
-/**
  * 🎯 SECURITY HEADERS
  * Set security headers untuk prevent common attacks
  */
