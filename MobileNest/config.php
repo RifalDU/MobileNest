@@ -46,7 +46,7 @@ define('ADMIN_PATH', __DIR__ . '/admin');
 define('UPLOADS_PATH', __DIR__ . '/uploads');
 
 // ===== HELPER FUNCTIONS - UTILITY ONLY =====
-// NOTE: Auth functions are in includes/auth-check.php
+// NOTE: Auth & Log functions are in includes/auth-check.php
 
 /**
  * Sanitize input to prevent XSS
@@ -103,22 +103,6 @@ function fetch_all($sql) {
         $data[] = $row;
     }
     return $data;
-}
-
-/**
- * Log activity to database (optional - buat tabel activity jika diperlukan)
- */
-function log_activity($action, $description = '') {
-    global $conn;
-    $user_id = isset($_SESSION['admin']) ? $_SESSION['admin'] : (isset($_SESSION['user']) ? $_SESSION['user'] : 0);
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    
-    $stmt = $conn->prepare("INSERT INTO activity_log (user_id, action, description, ip_address, created_at) VALUES (?, ?, ?, ?, NOW())");
-    if ($stmt) {
-        $stmt->bind_param('isss', $user_id, $action, $description, $ip);
-        $stmt->execute();
-        $stmt->close();
-    }
 }
 
 /**
