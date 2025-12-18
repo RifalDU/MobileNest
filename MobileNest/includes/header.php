@@ -1,6 +1,11 @@
 <?php
-// CRITICAL FIX: Include config to access is_logged_in() function and session variables
-require_once dirname(__DIR__) . '/config.php';
+// CRITICAL FIX: Show errors for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Include config to access is_logged_in() function and session variables
+// Path dari includes/ naik 1 level ke root folder
+require_once dirname(__FILE__) . '/../config.php';
 ?>
 <!DOCTYPE html>
 <html lang="id">
