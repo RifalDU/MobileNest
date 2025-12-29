@@ -1,4 +1,5 @@
 <?php
+// FILE: index.php
 // Include database config
 require_once 'config.php';
 
@@ -17,7 +18,6 @@ $keranjang_url = "transaksi/keranjang.php";
 include 'includes/header.php';
 ?>
 
-    <!-- HERO SECTION -->
     <section class="hero bg-primary text-white py-5">
         <div class="container">
             <div class="row align-items-center gy-4">
@@ -40,7 +40,6 @@ include 'includes/header.php';
         </div>
     </section>
 
-    <!-- KATEGORI SMARTPHONE -->
     <section class="kategori py-5 bg-light">
         <div class="container">
             <h2 class="text-center fw-bold mb-5">Kategori Smartphone</h2>
@@ -97,7 +96,6 @@ include 'includes/header.php';
         </div>
     </section>
 
-    <!-- PRODUK UNGGULAN -->
     <section class="produk py-5">
         <div class="container">
             <h2 class="text-center fw-bold mb-5">Produk Unggulan</h2>
@@ -112,16 +110,26 @@ include 'includes/header.php';
                         ?>
                         <div class="col">
                             <div class="card h-100 shadow-sm border-0 transition-card">
-                                <!-- Product Image Placeholder -->
-                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
-                                    <i class="bi bi-phone text-muted" style="font-size: 3rem;"></i>
-                                </div>
+                                
+                                <?php
+                                $gambar_db = $row['gambar'];
+                                $gambar_path = "uploads/" . $gambar_db;
+                                
+                                // Cek apakah gambar tidak kosong dan filenya benar-benar ada
+                                if (!empty($gambar_db) && file_exists($gambar_path)) {
+                                    echo '<img src="' . $gambar_path . '" class="card-img-top" alt="' . htmlspecialchars($row['nama_produk']) . '" style="height: 180px; object-fit: contain; padding: 10px;">';
+                                } else {
+                                    // Placeholder jika tidak ada gambar
+                                    echo '<div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
+                                            <i class="bi bi-phone text-muted" style="font-size: 3rem;"></i>
+                                          </div>';
+                                }
+                                ?>
                                 
                                 <div class="card-body">
                                     <h5 class="card-title fw-bold"><?php echo htmlspecialchars($row['nama_produk']); ?></h5>
                                     <p class="text-muted small mb-2"><?php echo htmlspecialchars($row['merek']); ?></p>
                                     
-                                    <!-- Rating -->
                                     <div class="mb-2">
                                         <span class="text-warning">
                                             <i class="bi bi-star-fill"></i>
@@ -132,10 +140,8 @@ include 'includes/header.php';
                                         </span>
                                     </div>
                                     
-                                    <!-- Price -->
                                     <h6 class="text-primary fw-bold mb-3">Rp <?php echo number_format($row['harga'], 0, ',', '.'); ?></h6>
                                     
-                                    <!-- Stock & Button -->
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="badge bg-success">Stok: <?php echo $row['stok']; ?></span>
                                         <a href="produk/detail-produk.php?id=<?php echo $row['id_produk']; ?>" class="btn btn-sm btn-primary">
@@ -148,12 +154,11 @@ include 'includes/header.php';
                         <?php
                     }
                 } else {
-                    echo '<div class="col-12"><p class="text-center text-muted">Belum ada produk tersedia.</p></div>';
+                    echo '<div class="col-12"><p class="text-center text-muted">Belum ada produk tersedia di database.</p></div>';
                 }
                 ?>
             </div>
             
-            <!-- Lihat Semua Produk -->
             <div class="text-center mt-5">
                 <a href="produk/list-produk.php" class="btn btn-primary btn-lg">
                     <i class="bi bi-arrow-right"></i> Lihat Semua Produk

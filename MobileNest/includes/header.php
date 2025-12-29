@@ -1,11 +1,11 @@
 <?php
-// CRITICAL FIX: Show errors for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// CRITICAL: Start session at the very beginning before any output
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Include config to access is_logged_in() function and session variables
-// Path dari includes/ naik 1 level ke root folder
-require_once dirname(__FILE__) . '/../config.php';
+// CRITICAL FIX: Include config to access is_logged_in() function and session variables
+require_once dirname(__DIR__) . '/config.php';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -81,8 +81,8 @@ require_once dirname(__FILE__) . '/../config.php';
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="<?php echo SITE_URL; ?>/transaksi/keranjang.php">
-                                <i class="bi bi-cart3"></i> 
-                                <span class="badge bg-danger"><?php echo !empty($_SESSION['cart']) ? count($_SESSION['cart']) : 0; ?></span>
+                                <i class="bi bi-cart"></i> Keranjang
+                                <span id="cart-count-badge" class="badge bg-danger" style="display: none;">0</span>
                             </a>
                         </li>
                     <!-- Menu Jika User Belum Login -->
@@ -99,8 +99,8 @@ require_once dirname(__FILE__) . '/../config.php';
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="<?php echo SITE_URL; ?>/transaksi/keranjang.php">
-                                <i class="bi bi-cart3"></i> 
-                                <span class="badge bg-danger"><?php echo !empty($_SESSION['cart']) ? count($_SESSION['cart']) : 0; ?></span>
+                                <i class="bi bi-cart"></i> Keranjang
+                                <span id="cart-count-badge" class="badge bg-danger" style="display: none;">0</span>
                             </a>
                         </li>
                     <?php endif; ?>

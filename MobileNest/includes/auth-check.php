@@ -21,7 +21,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Include database connection
 if (!isset($conn)) {
-    require_once __DIR__ . '/../config.php';
+    require_once __DIR__ . '/config.php';
 }
 
 /**
@@ -203,6 +203,21 @@ function getBaseUrl() {
         $basePath = '';
     }
     return $protocol . '://' . $host . $basePath;
+}
+
+/**
+ * 📋 LOG ACTIVITY (optional)
+ * Catat setiap aktivitas penting untuk audit
+ */
+function log_activity($action, $details, $conn) {
+    $user_id = get_user_id();
+    $role = get_user_role();
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $timestamp = date('Y-m-d H:i:s');
+    
+    // TODO: Buat tabel activity_log untuk audit trail
+    // INSERT INTO activity_log (user_id, role, action, details, ip, timestamp)
+    // VALUES (?, ?, ?, ?, ?, ?)
 }
 
 /**
